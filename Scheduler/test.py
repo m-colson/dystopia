@@ -8,7 +8,7 @@ data = {
         "movement": "false"
        }
 
-response = requests.post("http://127.0.0.1:5000/request/ride", json=data, timeout=2.5)
+response = requests.post("http://127.0.0.1:5000/ride", json=data, timeout=2.5)
 
 if response.status_code == 200:
     data = response.text
@@ -16,4 +16,4 @@ if response.status_code == 200:
 else:
     print("Failed to retrieve data, status code:", response.status_code)
 
-response = request.post("http://127.0.0.1:5000/ride/done?id=1")
+response = requests.post("http://127.0.0.1:5000/ride/done?id=1")
