@@ -1,5 +1,7 @@
 package com.ai.doomers;
 
+import java.util.HashSet;
+import java.util.Set;
 
 public class Vehicle {
 
@@ -7,8 +9,7 @@ public class Vehicle {
     private String make;
     private int capacity;
     private int id;
-    private boolean wheelchairADA;
-    private boolean visionImpairedADA;
+    private Set<VehicleFlag> flags;
 
 
     // Modified constructor to generate a random ID if not provided
@@ -16,7 +17,15 @@ public class Vehicle {
         this.model = carModel;
         this.make = carMake;
         this.capacity = carCapacity;
-        this.visionImpairedADA = visionImpaired ;
+        
+        this.flags = new HashSet<>();
+        if(wheelchair) {
+            flags.add(VehicleFlag.WheelchairAccess);
+        }
+        if(visionImpaired) {
+            flags.add(VehicleFlag.VisionAccess);
+        }
+
         this.id = carId;
     }
 
@@ -37,10 +46,7 @@ public class Vehicle {
         return id;
     }
 
-    public boolean isVisionImpairedADA() {
-        return visionImpairedADA;
-    }
-    public boolean isWheelchairADA() {
-        return wheelchairADA;
+    public Set<VehicleFlag> getFlags() {
+        return flags;
     }
 }

@@ -15,10 +15,12 @@ public class VehicleController {
     }
 
     @GetMapping("/find/cars")
-    public List<Vehicle> findCars(@RequestParam int capacity, 
-                                  @RequestParam boolean wheelchairADA, 
-                                  @RequestParam boolean visionImpairedADA) {
-        return vehicleService.findVehicles(capacity, wheelchairADA, visionImpairedADA);
+
+    public List<Vehicle> findCars(@RequestParam int capacity,  @RequestParam(required = false) String flags) {
+        System.out.println("Capacity: " + capacity);
+        System.out.println("Flags String: " + flags);
+        vehicleService.inventoryProcessor();
+        return vehicleService.findVehicles(capacity, VehicleFlag.parseCommaSeperated(flags));
     }
 
     @PostMapping("/mark/in/use")
