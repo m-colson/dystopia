@@ -22,17 +22,16 @@ This is a post request and gets a json objet in this format:
 def request_ride():
     if request.method == 'POST':
         json = request.get_json()
-
+        capacity = json["passengers"]
         current_location = json['current_location']
         destination = json['destination']
-        # passengers = json['passengers']
-        # flags = json['flags']
+        flags = json['flags']
 
         # get cars from inventory
-        cars = find_cars(request.get_json())
+        cars = find_cars(capacity, flags)
 
         # get closest car from PFaaS
-        closest_car = find_closest_car(cars, request.args['current_loaction'])
+        closest_car = find_closest_car(cars, current_location)
 
         # tell inventory car is being used
         mark_in_use(closest_car)
@@ -68,11 +67,8 @@ def ride_done():
 makes a request to the inventory to get all cars that match the requesters
 needs. ie number of passengers and disabilities
 '''
-def find_cars(args):
-    endpoint = "http://127.0.0.1:8080/find/cars?"
-    endpoint += "capacity=" + args['passengers'] + "&"
-    endpoint += "wheelchairADA=" + args['vision'] + "&"
-    endpoint += "visionImpairedADA=" + args['movement']
+def find_cars(capacity, flags):
+    endpoint = f"http://127.0.0.1:8080/find/cars?capacity={capacity}&flags:{flags}"
     print(endpoint)
     request = requests.get(endpoint)
     cars = request.json()
