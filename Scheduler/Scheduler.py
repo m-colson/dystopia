@@ -48,19 +48,31 @@ def ride_done():
 
 def find_cars(args):
     endpoint = "http://127.0.0.1:8080/find/cars?"
-    endpoint += "passengers=" + args['passengers'] + "&"
-    endpoint += "vision=" + args['vision'] + "&"
-    endpoint += "movement=" + args['movement']
-    
+    endpoint += "capacity=" + args['passengers'] + "&"
+    endpoint += "wheelchairADA=" + args['vision'] + "&"
+    endpoint += "visionImpairedADA=" + args['movement']
+    print(endpoint)
     request = requests.get(endpoint)
     cars = request.json()
     
 
+'''
+makes a request to the PFaaS to find the closest car to 
+a destination from a list of cars.
+'''
+def find_closest_car(cars, destination):
+    endpoint = PFaaS_endpoint + "/api/closest?to="
+    endpoint += f"{destination}&to="
 
-def find_closest_car(cars, ):
-    endpoint = PFaaS_endpoint + "/api/closest?to={}"
-    for car in cars:
-        endpoint += 
+    for i, car in enumerate(cars):
+        if i != len(cars):
+            endpoint += car + ","
+        else:
+            endpoint += car
+    request = requests(endpoint)
+
+    return request.json()["id"]
+    
 
 if __name__ == '__main__':
     app.run(debug=True)
