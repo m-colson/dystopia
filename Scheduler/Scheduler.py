@@ -6,7 +6,8 @@ PFaaS_endpoint = "http://127.0.0.1:9000"
 aidoom_endpoint = "http://127.0.0.1:8080" 
 
 '''
-This endpoint gets called when someone requests a ride from the frontend
+This endpoint gets called when someone requests a ride from the frontend.
+Ends when a suitable car is found and sent to the requesters location
 This is a post request and gets a json objet in this format:
     {
         "current_location":"your mom's house", 
@@ -14,6 +15,7 @@ This is a post request and gets a json objet in this format:
         "passengers": "4",
         "flags": "0,0"
     }
+
 '''
 @app.post("/ride")
 def request_ride():
@@ -25,16 +27,33 @@ def request_ride():
         passengers = json['passengers']
         flags = json['flags']
 
-
-        # get cars from aidoom
+        # get cars from inventory
         cars = find_cars(request.get_json())
 
         # get closest car from PFaaS
         closest_car = find_closest_car(cars, request.args['current_loaction'])
 
-        return "sending ride", 200
+        # tell inventory car is being used
+        mark_in_use(closest_car)
+
+        # send the car to the requester
+        response = send_to_requester(closest_car)
+        response = response.json()
+        time = response["totalTime"]
+
+        return f"sending car with id {closest_car}, arriving in {time} time.", 200
     else:
         return "error", 400
+
+'''
+when the ride arrives at the requesters location, this endpoint is 
+called from the worldsate. the user is sent a notification and the
+cars new path to the requesters final desination is gotten from the
+PFaaS
+'''
+@app.put("/ride/arrived")
+def ride_arrived():
+    pass
 
 '''
 This enpoint gets called when a ride is done. The worldstate sends the 
@@ -45,7 +64,10 @@ def ride_done():
     if request.method == 'GET':
         print(request.args)
 
-
+'''
+makes a request to the inventory to get all cars that match the requesters
+needs. ie number of passengers and disabilities
+'''
 def find_cars(args):
     endpoint = "http://127.0.0.1:8080/find/cars?"
     endpoint += "capacity=" + args['passengers'] + "&"
@@ -54,7 +76,7 @@ def find_cars(args):
     print(endpoint)
     request = requests.get(endpoint)
     cars = request.json()
-    
+
 
 '''
 makes a request to the PFaaS to find the closest car to 
@@ -73,6 +95,21 @@ def find_closest_car(cars, destination):
 
     return request.json()["id"]
     
+'''
+sends a put request to inventory to make a car as in use
+/mark/in/use?id={id}
+'''
+def mark_in_use(id):
+    pass
+
+'''
+makes a request to the PFaaS to find the best path from a 
+cars current location to the location of the requester
+/api/path?from={id}&to={destination}
+'''
+def send_to_requester(id, destination):
+    pass
+
 
 if __name__ == '__main__':
     app.run(debug=True)
