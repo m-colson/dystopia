@@ -54,6 +54,8 @@ def find_cars(args):
     
     request = requests.get(endpoint)
     cars = request.json()
+    
+
 
 def find_closest_car(cars, ):
     endpoint = PFaaS_endpoint + "/api/closest?to={}"
