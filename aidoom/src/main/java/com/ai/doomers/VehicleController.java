@@ -25,4 +25,9 @@ public class VehicleController {
     public void markVehicleInUse(@RequestParam int id) {
         vehicleService.markVehicleAsUsed(id);
     }
+
+    @PostMapping("/mark/ride/over")
+    public void returningVehicles(@RequestParam int id ){
+        vehicleService.returningVehicles(id);       
+    }
 }
