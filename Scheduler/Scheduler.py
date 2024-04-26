@@ -128,6 +128,5 @@ def send_to_requester(id, rider_location, destination):
     request = request.json()["pos"]
     return 
 
-
 if __name__ == '__main__':
     app.run(debug=True)
