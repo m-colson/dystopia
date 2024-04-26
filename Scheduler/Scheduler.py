@@ -1,5 +1,25 @@
+'''
+By: Skyler DeVaughn
+Course: ECE 479
+
+Schdeuler.py is the file that orchistrates communication and actions made by the 
+PFaaS (Path Finding as a Service) and aidoom (Inventory Management System) and the
+World State (tracking all active cars)
+
+When a user makes a request for a ride, a front end sends a POST request with /ride.
+This sets a seriers of events into action, 1) asking aidoom for cars that fit the request
+2) asking PFaaS for the car that is the closest to the requester 3) telling aidoom 
+which car is going to be used (i.e. the cosest car) 4) telling the PFaaS to send the 
+closest car to the reqester
+
+Once these four steps are complete, the World State will keep track of the cars and 
+where they are. Once the ride is over the worldstate will send a request with the 
+/ride/at/dest endpoint. Then aidoom will be told to put the car that was used for that
+trip that the car can be put in the inactive pool again.
+'''
+
 import requests
-from flask import Flask, request, make_response, jsonify
+from flask import Flask, request
 app = Flask(__name__)
 
 PFaaS_endpoint = "http://127.0.0.1:9080"
@@ -16,7 +36,6 @@ This is a post request and gets a json objet in this format:
         "passengers": "4",
         "flags": "0,0"
     }
-
 '''
 @app.post("/ride")
 def request_ride():
@@ -27,7 +46,7 @@ def request_ride():
         destination = json['destination']
         flags = json['flags']
 
-        # get cars from inventory
+        # get cars from inventory that match user requirements
         cars = find_cars(capacity, flags)
 
         # get closest car from PFaaS
