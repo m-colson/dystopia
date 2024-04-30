@@ -5,6 +5,10 @@
     <title>World Simulation</title>
 
     <style>
+        :root {
+            font-size: 24px;
+        }
+
         html,
         body {
             margin: 0;
@@ -26,9 +30,92 @@
             width: 100%;
             height: 100%;
         }
+
+        .property-window {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+
+            border-radius: 1rem;
+            background-color: #2e2e2e;
+
+            padding: 1rem;
+
+            display: flex;
+            flex-direction: column;
+
+            gap: 0.25rem;
+        }
+
+        .property-window span {
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+
+            gap: 0.5rem;
+        }
+
+        h1,
+        h2,
+        p,
+        label,
+        button {
+            color: white;
+            margin: 0;
+        }
+
+        input {
+            background-color: #3f3f3f;
+            color: white;
+            outline: 0px;
+            border-style: none;
+
+            font-size: 1rem;
+        }
+
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[type=number] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+
+            text-align: right;
+
+            width: 5rem;
+        }
+
+        input[type=checkbox] {
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 0.5rem;
+        }
+
+        button {
+            background-color: #3f3f3f;
+            outline: none;
+            border-style: none;
+            padding: 0.25rem;
+            border-radius: 0.5rem;
+
+            cursor: pointer;
+            font-size: 0.75rem;
+
+            transition: background-color 200ms;
+        }
+
+        button:hover {
+            background-color: #4f4f4f;
+        }
     </style>
 
     <script>
+        const schedulerHost = 'http://localhost:5000';
+
         var nodes = {};
 
         function loadNodes() {
@@ -144,6 +231,8 @@
             const canvas = document.getElementById('map');
             const ctx = canvas.getContext('2d');
 
+            canvas.addEventListener('click', canvasClickHandler());
+
             let prevTime;
             function draw(timestamp) {
                 if (prevTime === undefined) {
@@ -195,11 +284,102 @@
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
         }
+
+        function canvasClickHandler() {
+            let selected = null;
+
+            function clearRequest() {
+                selected = null;
+                document.getElementById('request-from').value = '';
+                document.getElementById('request-to').value = '';
+                document.getElementById('request-cap').value = '4';
+                document.getElementById('request-wheelchair').checked = false;
+                document.getElementById('request-access').checked = false;
+            }
+
+            document.getElementById('request-clear').addEventListener('click', clearRequest)
+            document.getElementById('request-submit').addEventListener('click', async () => {
+                let reqBody = {
+                    from: document.getElementById('request-from').value,
+                    to: document.getElementById('request-to').value,
+                    capacity: document.getElementById('request-cap').value,
+                }
+
+                let flags = [];
+                if (document.getElementById('request-wheelchair').checked) {
+                    flags.push('wheelchair');
+                }
+                if (document.getElementById('request-access').checked) {
+                    flags.push('vision');
+                }
+                if (flags.length > 0) {
+                    reqBody.flags = flags.join(",");
+                }
+
+                let resp = await fetch(
+                    `/proxy/${schedulerHost}/ride`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(reqBody)
+                    })
+                let body = await resp.json();
+                console.log(body);
+                clearRequest();
+            })
+
+            return (event) => {
+                let worldX = event.x - window.innerWidth / 2;
+                let worldY = event.y - window.innerHeight / 2;
+
+                for ([id, node] of Object.entries(nodes)) {
+                    let dist = Math.sqrt(Math.pow(worldX - node.pos.x, 2) + Math.pow(worldY - node.pos.y, 2));
+
+                    if (dist < 10) {
+                        if (selected === null) {
+                            selected = id;
+                            document.getElementById('request-from').value = id;
+                        } else {
+                            document.getElementById('request-to').value = id;
+                        }
+
+                        return;
+                    }
+                }
+            }
+        }
     </script>
 </head>
 
 <body onload="setup()" onresize="resize()">
     <canvas id="map"></canvas>
+    <div class="property-window">
+        <h1>new trip</h1>
+        <span>
+            <label for="request-from">from</label>
+            <input type="number" id="request-from" name="from" disabled>
+        </span>
+        <span>
+            <label for="request-to">to</label>
+            <input type="number" id="request-to" name="request-to" disabled>
+        </span>
+        <span>
+            <label for="request-cap">people</label>
+            <input type="number" id="request-cap" value="4" name="request-cap">
+        </span>
+        <span>
+            <label for="request-access">wheelchair access</label>
+            <input type="checkbox" id="request-wheelchair" name="request-wheelchair">
+        </span>
+        <span>
+            <label for="request-access">vision access</label>
+            <input type="checkbox" id="request-access" name="request-access">
+        </span>
+        <span>
+            <button id="request-clear">clear</button>
+            <button id="request-submit">submit</button>
+        </span>
+    </div>
 </body>
 
 </html>
