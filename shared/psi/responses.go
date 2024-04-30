@@ -115,6 +115,10 @@ func (e *BadRequestError) StatusCode() int {
 	return http.StatusBadRequest
 }
 
+func (e *BadRequestError) Error() string {
+	return e.Inner.Error()
+}
+
 type NotFoundError struct{}
 
 func (e *NotFoundError) StatusCode() int {

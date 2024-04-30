@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -24,6 +25,20 @@ func (e *MissingQueryParam) Error() string {
 	return fmt.Sprintf("missing URL parameter '%s'", e.name)
 }
 
+type IllegalQueryParam struct {
+	name  string
+	value string
+	inner error
+}
+
+func (e *IllegalQueryParam) StatusCode() int {
+	return http.StatusBadRequest
+}
+
+func (e *IllegalQueryParam) Error() string {
+	return fmt.Sprintf("illegal value '%s' for query parameter '%s': %s", e.value, e.name, e.inner)
+}
+
 func queryParam(r *http.Request, name string) (string, psi.StatusCode) {
 	value := r.URL.Query()[name]
 	if len(value) == 0 {
@@ -39,7 +54,11 @@ func parseQueryParam(r *http.Request, name string) (graph.NodeID, psi.StatusCode
 	}
 	id, err := graph.ParseID(value)
 	if err != nil {
-		return 0, &psi.BadRequestError{Inner: err}
+		return 0, &IllegalQueryParam{
+			name:  name,
+			value: value,
+			inner: err,
+		}
 	}
 	return id, nil
 
@@ -112,19 +131,29 @@ func AddRoutes(r psi.Router) error {
 				return queryErr
 			}
 
-			optionsRaw, queryErr := queryParam(r, "options")
+			carOptionsRaw, queryErr := queryParam(r, "options")
 			if queryErr != nil {
 				return queryErr
 			}
-			optionsStrs := strings.Split(optionsRaw, ",")
+			carOptionsStrs := strings.Split(carOptionsRaw, ",")
 
-			options := make([]graph.NodeID, 0, len(optionsStrs))
-			for _, optionStr := range optionsStrs {
-				option, err := graph.ParseID(optionStr)
+			carOptions := make([]graph.CarID, 0, len(carOptionsStrs))
+			for _, optionStr := range carOptionsStrs {
+				option, err := graph.ParseCarID(optionStr)
 				if err != nil {
-					return &psi.BadRequestError{Inner: err}
+					return &IllegalQueryParam{name: "options", value: carOptionsRaw, inner: err}
 				}
-				options = append(options, option)
+				carOptions = append(carOptions, option)
+			}
+
+			cars, err := findCarIDS(carOptions...)
+			if err != nil {
+				panic(err)
+			}
+
+			options := make([]graph.NodeID, 0, len(cars))
+			for _, car := range cars {
+				options = append(options, car.Pos.From)
 			}
 
 			graph := r.Context().Value(GraphKey{}).(graph.Graph)
@@ -137,6 +166,45 @@ func AddRoutes(r psi.Router) error {
 		})
 	})
 	return nil
+}
+
+const WORLD_STATE_HOST = "http://localhost:9081"
+
+func findCarIDS(ids ...graph.CarID) ([]graph.Car, error) {
+	client := http.Client{}
+
+	idsStr := strings.Builder{}
+	for i, id := range ids {
+		if i > 0 {
+			idsStr.WriteString(",")
+		}
+		fmt.Fprintf(&idsStr, "%d", id)
+	}
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/cars?ids=%s", WORLD_STATE_HOST, idsStr.String()), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	out := make([]graph.Car, 0, len(ids))
+
+	if respBytes, err := io.ReadAll(resp.Body); err == nil {
+		fmt.Printf("%s\n", respBytes)
+	} else {
+		fmt.Println(err)
+	}
+
+	// if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	// 	return nil, err
+	// }
+
+	return out, nil
 }
 
 func main() {

@@ -1,4 +1,4 @@
-package main
+package graph
 
 import (
 	"strconv"
@@ -12,9 +12,10 @@ type CarsMap struct {
 }
 
 type Car struct {
-	ID   CarID
-	Trip Trip
-	Pos  CarPos
+	ID       CarID
+	Trip     Trip
+	Pos      CarPos
+	CurrPath []NodeID
 }
 
 type CarID uint64
@@ -32,18 +33,6 @@ func ParseCarID(s string) (out CarID, err error) {
 type Trip struct {
 	From NodeID
 	To   NodeID
-}
-
-type NodeID uint64
-
-const SENTINAL_NODE = NodeID(1<<63 - 1)
-
-func ParseNodeID(s string) (out NodeID, err error) {
-	idNum, err := strconv.ParseUint(s, 10, 64)
-	if err != nil {
-		return SENTINAL_NODE, err
-	}
-	return NodeID(idNum), nil
 }
 
 type CarPos struct {

@@ -13,10 +13,10 @@ import (
 	backend "github.com/m-colson/psi/backend-chi"
 )
 
-func RequestInsertCars(cars *CarsMap) func(next http.Handler) http.Handler {
+func RequestInsertCars(cars *graph.CarsMap) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			r = r.WithContext(context.WithValue(r.Context(), CarsKey{}, cars))
+			r = r.WithContext(context.WithValue(r.Context(), graph.CarsKey{}, cars))
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -46,8 +46,8 @@ func main() {
 		return
 	}
 
-	cars := CarsMap{
-		Cars: make(map[CarID]*Car),
+	cars := graph.CarsMap{
+		Cars: make(map[graph.CarID]*graph.Car),
 		Lock: sync.Mutex{},
 	}
 
@@ -62,7 +62,7 @@ func main() {
 
 	psi.New[*psi.PsiServer](
 		backend.Register,
-		psi.Use(RequestInsertCars(&cars), RequestInsertGraph(&graph)),
+		psi.Use(psi.LogRecoverer, RequestInsertCars(&cars), RequestInsertGraph(&graph)),
 		AddApiRoutes,
 		AddFrontendRoutes,
 	).Serve("localhost:9081").OrFatal()
