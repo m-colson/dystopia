@@ -2,11 +2,14 @@ module github.com/m-colson/dystopia/pfaas
 
 go 1.22.0
 
-replace github.com/m-colson/psi => ./psi
+replace github.com/m-colson/psi => ../shared/psi
 
-replace github.com/m-colson/psi/backend-chi => ./psi/backend-chi
+replace github.com/m-colson/psi/backend-chi => ../shared/psi/backend-chi
+
+replace github.com/m-colson/dystopia/shared/graph => ../shared/graph
 
 require (
+	github.com/m-colson/dystopia/shared/graph v0.0.0-00010101000000-000000000000
 	github.com/m-colson/psi v0.0.0-00010101000000-000000000000
 	github.com/m-colson/psi/backend-chi v0.0.0-00010101000000-000000000000
 )

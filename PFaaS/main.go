@@ -8,6 +8,8 @@ import (
 
 	"github.com/m-colson/psi"
 	backend "github.com/m-colson/psi/backend-chi"
+
+	"github.com/m-colson/dystopia/shared/graph"
 )
 
 type MissingQueryParam struct {
@@ -30,12 +32,12 @@ func queryParam(r *http.Request, name string) (string, psi.StatusCode) {
 	return value[0], nil
 }
 
-func parseQueryParam(r *http.Request, name string) (NodeID, psi.StatusCode) {
+func parseQueryParam(r *http.Request, name string) (graph.NodeID, psi.StatusCode) {
 	value, queryErr := queryParam(r, name)
 	if queryErr != nil {
 		return 0, queryErr
 	}
-	id, err := ParseNodeID(value)
+	id, err := graph.ParseID(value)
 	if err != nil {
 		return 0, &psi.BadRequestError{Inner: err}
 	}
@@ -46,17 +48,17 @@ func parseQueryParam(r *http.Request, name string) (NodeID, psi.StatusCode) {
 type GraphKey struct{}
 
 func RequestInsertGraph(next http.Handler) http.Handler {
-	graph := NewGraph([]Link{
-		{1, 5, 2},
-		{1, 1, 3},
-		{2, 1, 4},
-		{2, 1, 5},
-		{3, 1, 5},
-		{3, 2, 7},
-		{4, 1, 6},
-		{5, 2, 6},
-		{6, 1, 8},
-		{7, 6, 8},
+	graph := graph.New([]graph.Link{
+		{From: 1, Cost: 5, To: 2},
+		{From: 1, Cost: 1, To: 3},
+		{From: 2, Cost: 1, To: 4},
+		{From: 2, Cost: 1, To: 5},
+		{From: 3, Cost: 1, To: 5},
+		{From: 3, Cost: 2, To: 7},
+		{From: 4, Cost: 1, To: 6},
+		{From: 5, Cost: 2, To: 6},
+		{From: 6, Cost: 1, To: 8},
+		{From: 7, Cost: 6, To: 8},
 	}...)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +82,7 @@ func AddRoutes(r psi.Router) error {
 		r.Get("/path", func(r *http.Request) psi.StatusCode {
 			type PathResponse struct {
 				psi.OkData
-				Path []NodeID `json:"path"`
+				Path []graph.NodeID `json:"path"`
 				// TotalTime float64  `json:"totalTime"`
 			}
 
@@ -94,7 +96,7 @@ func AddRoutes(r psi.Router) error {
 				return queryErr
 			}
 
-			graph := r.Context().Value(GraphKey{}).(Graph)
+			graph := r.Context().Value(GraphKey{}).(graph.Graph)
 			path := Dijkstra(graph, from, to)
 
 			return &PathResponse{Path: path}
@@ -102,7 +104,7 @@ func AddRoutes(r psi.Router) error {
 		r.Get("/closest", func(r *http.Request) psi.StatusCode {
 			type ClosestResponse struct {
 				psi.OkData
-				Id NodeID `json:"id"`
+				Id graph.NodeID `json:"id"`
 			}
 
 			to, queryErr := parseQueryParam(r, "to")
@@ -116,16 +118,16 @@ func AddRoutes(r psi.Router) error {
 			}
 			optionsStrs := strings.Split(optionsRaw, ",")
 
-			options := make([]NodeID, 0, len(optionsStrs))
+			options := make([]graph.NodeID, 0, len(optionsStrs))
 			for _, optionStr := range optionsStrs {
-				option, err := ParseNodeID(optionStr)
+				option, err := graph.ParseID(optionStr)
 				if err != nil {
 					return &psi.BadRequestError{Inner: err}
 				}
 				options = append(options, option)
 			}
 
-			graph := r.Context().Value(GraphKey{}).(Graph)
+			graph := r.Context().Value(GraphKey{}).(graph.Graph)
 			node, ok := DijkstraClosest(graph, to, options...)
 			if !ok {
 				return &psi.NotAcceptableError{}

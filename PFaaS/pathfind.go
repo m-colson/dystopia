@@ -2,11 +2,13 @@ package main
 
 import (
 	"container/heap"
+
+	"github.com/m-colson/dystopia/shared/graph"
 )
 
-func dijkstraAlgorithm(prev map[NodeID]NodeID, heapLut map[NodeID]*DataEntry, bestHeap *DataHeap, g *Graph, dests []NodeID) {
+func dijkstraAlgorithm(prev map[graph.NodeID]graph.NodeID, heapLut map[graph.NodeID]*graph.DataEntry, bestHeap *graph.DataHeap, g *graph.Graph, dests []graph.NodeID) {
 	for bestHeap.Len() > 0 {
-		best := heap.Pop(bestHeap).(*DataEntry)
+		best := heap.Pop(bestHeap).(*graph.DataEntry)
 		for _, dest := range dests {
 			if best.Id == dest {
 				break
@@ -22,28 +24,28 @@ func dijkstraAlgorithm(prev map[NodeID]NodeID, heapLut map[NodeID]*DataEntry, be
 			}
 
 			if !alreadyExists {
-				edgeEntry = &DataEntry{Id: edge.To, Cost: 1<<63 - 1}
+				edgeEntry = &graph.DataEntry{Id: edge.To, Cost: 1<<63 - 1}
 				heap.Push(bestHeap, edgeEntry)
 				heapLut[edge.To] = edgeEntry
 			}
 
 			prev[edge.To] = best.Id
 			edgeEntry.Cost = alt
-			heap.Fix(bestHeap, edgeEntry.index)
+			heap.Fix(bestHeap, edgeEntry.Index)
 		}
 	}
 }
 
-func Dijkstra(g Graph, source NodeID, dests ...NodeID) []NodeID {
-	prev := make(map[NodeID]NodeID)
+func Dijkstra(g graph.Graph, source graph.NodeID, dests ...graph.NodeID) []graph.NodeID {
+	prev := make(map[graph.NodeID]graph.NodeID)
 
-	heapLut := make(map[NodeID]*DataEntry)
-	bestHeap := &DataHeap{{Id: source, Cost: 0}}
+	heapLut := make(map[graph.NodeID]*graph.DataEntry)
+	bestHeap := &graph.DataHeap{{Id: source, Cost: 0}}
 	heap.Init(bestHeap)
 
 	dijkstraAlgorithm(prev, heapLut, bestHeap, &g, dests)
 
-	closestDest := SENTINAL_NODE
+	closestDest := graph.SENTINAL_NODE
 	for _, dest := range dests {
 		if _, ok := prev[dest]; ok {
 			closestDest = dest
@@ -51,11 +53,11 @@ func Dijkstra(g Graph, source NodeID, dests ...NodeID) []NodeID {
 		}
 	}
 
-	if closestDest == SENTINAL_NODE {
-		return []NodeID{}
+	if closestDest == graph.SENTINAL_NODE {
+		return []graph.NodeID{}
 	}
 
-	out := make([]NodeID, 0)
+	out := make([]graph.NodeID, 0)
 
 	temp := closestDest
 	for temp != source {
@@ -66,16 +68,16 @@ func Dijkstra(g Graph, source NodeID, dests ...NodeID) []NodeID {
 	return out
 }
 
-func DijkstraClosest(g Graph, source NodeID, dests ...NodeID) (closest NodeID, ok bool) {
-	prev := make(map[NodeID]NodeID)
+func DijkstraClosest(g graph.Graph, source graph.NodeID, dests ...graph.NodeID) (closest graph.NodeID, ok bool) {
+	prev := make(map[graph.NodeID]graph.NodeID)
 
-	heapLut := make(map[NodeID]*DataEntry)
-	bestHeap := &DataHeap{{Id: source, Cost: 0}}
+	heapLut := make(map[graph.NodeID]*graph.DataEntry)
+	bestHeap := &graph.DataHeap{{Id: source, Cost: 0}}
 	heap.Init(bestHeap)
 
 	dijkstraAlgorithm(prev, heapLut, bestHeap, &g, dests)
 
-	closest = SENTINAL_NODE
+	closest = graph.SENTINAL_NODE
 	for _, dest := range dests {
 		if _, ok := prev[dest]; ok {
 			closest = dest
@@ -83,5 +85,5 @@ func DijkstraClosest(g Graph, source NodeID, dests ...NodeID) (closest NodeID, o
 		}
 	}
 
-	return closest, closest != SENTINAL_NODE
+	return closest, closest != graph.SENTINAL_NODE
 }
