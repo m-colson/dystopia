@@ -1,6 +1,18 @@
 package main
 
+import "strconv"
+
 type NodeID uint64
+
+const SENTINAL_NODE = NodeID(1<<63 - 1)
+
+func ParseNodeID(s string) (out NodeID, err error) {
+	idNum, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return SENTINAL_NODE, err
+	}
+	return NodeID(idNum), nil
+}
 
 type Graph struct {
 	Nodes map[NodeID]Node

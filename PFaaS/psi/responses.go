@@ -111,6 +111,10 @@ type BadRequestError struct {
 	Inner error `json:"-"`
 }
 
+func (e *BadRequestError) StatusCode() int {
+	return http.StatusBadRequest
+}
+
 type NotFoundError struct{}
 
 func (e *NotFoundError) StatusCode() int {
