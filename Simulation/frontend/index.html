@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>World Simulation</title>
+
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+
+            width: 100%;
+            height: 100%;
+
+            background-color: #1e1e1e;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+
+    <script>
+        var nodes = {};
+
+        function loadNodes() {
+            function hsv2rgb(h, s, v) {
+                let f = (n, k = (n + h / 60) % 6) => v - v * s * Math.max(Math.min(k, 4 - k, 1), 0);
+                return { r: f(5) * 255, g: f(3) * 255, b: f(1) * 255 };
+            }
+
+            fetch('/api/graph')
+                .then(resp => resp.json())
+                .then(data => {
+                    let graph = data.graph;
+                    Object.entries(graph.nodes).forEach(([id, node]) => {
+                        if (nodes[id] === undefined) {
+                            nodes[id] = node;
+                            nodes[id].pos = {
+                                x: (Math.random() - 0.5) * 1000,
+                                y: (Math.random() - 0.5) * 1000,
+                            }
+                            nodes[id].color = hsv2rgb(Math.random() * 360, 0.6, 1);
+                        } else {
+                            nodes[id].next = node.next;
+                        }
+                    })
+                })
+        }
+        loadNodes();
+
+        function updateNodes() {
+            const COST_MUL = 30;
+            const CENTER_FORCE = 1;
+            const ATTRACT_FORCE = 10;
+            const REPEL_FORCE = 100000;
+
+            if (Object.keys(nodes).length === 0) {
+                return;
+            }
+
+            let deltas = {
+            };
+
+            // TERRIBLE ALGORITHM
+            let nodeEntries = Object.entries(nodes);
+            nodeEntries.forEach(([id, node]) => {
+                let edges = node.next.reduce((acc, edge) => {
+                    acc[edge.to] ??= [];
+                    acc[edge.to].push(edge.cost);
+
+                    return acc;
+                }, {})
+
+
+                nodeEntries.forEach(([otherId, otherNode]) => {
+                    deltas[otherId] ??= {
+                        x: -otherNode.pos.x * CENTER_FORCE,
+                        y: -otherNode.pos.y * CENTER_FORCE,
+                    }
+
+                    if (id === otherId) {
+                        return;
+                    }
+
+                    if (edges[otherId] !== undefined) {
+                        edges[otherId].forEach(cost => {
+                            let distx = node.pos.x - otherNode.pos.x;
+                            let disty = node.pos.y - otherNode.pos.y;
+
+                            let dist = Math.sqrt(Math.pow(distx, 2) + Math.pow(disty, 2));
+                            let target = cost * COST_MUL;
+
+                            let force = (dist - target) * ATTRACT_FORCE;
+                            let ang = Math.atan2(disty, distx);
+
+                            let dx = Math.cos(ang) * force;
+                            let dy = Math.sin(ang) * force;
+                            deltas[otherId].x += dx;
+                            deltas[otherId].y += dy;
+                            deltas[id].x -= dx;
+                            deltas[id].y -= dy;
+                        })
+                    } else {
+                        let distx = node.pos.x - otherNode.pos.x;
+                        let disty = node.pos.y - otherNode.pos.y;
+
+                        let dist = Math.pow(distx, 2) + Math.pow(disty, 2);
+                        if (dist < 0.1) {
+                            dist = 0.1;
+                        }
+
+                        let ang = Math.atan2(disty, distx);
+
+                        let dx = Math.cos(ang) * (1 / dist) * REPEL_FORCE;
+                        let dy = Math.sin(ang) * (1 / dist) * REPEL_FORCE;
+                        deltas[otherId].x -= dx;
+                        deltas[otherId].y -= dy;
+                        deltas[id].x += dx;
+                        deltas[id].y += dy;
+                    }
+                });
+            })
+
+            Object.entries(deltas).forEach(([id, d]) => {
+                let cdist = Math.sqrt(Math.pow(d.x, 2) + Math.pow(d.y, 2));
+
+                nodes[id].pos.x += d.x * 0.01;
+                nodes[id].pos.y += d.y * 0.01;
+            })
+        }
+
+        function setup() {
+            resize();
+
+            const canvas = document.getElementById('map');
+            const ctx = canvas.getContext('2d');
+
+            let prevTime;
+            function draw(timestamp) {
+                if (prevTime === undefined) {
+                    prevTime = timestamp;
+                }
+                const dt = timestamp - prevTime;
+
+                updateNodes(dt);
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                midx = window.innerWidth / 2;
+                midy = window.innerHeight / 2;
+                Object.entries(nodes).forEach(([id, node]) => {
+                    let rgb = node.color;
+                    ctx.strokeStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
+                    ctx.lineWidth = 2;
+                    node.next.forEach(edge => {
+                        let other = nodes[edge.to];
+                        ctx.beginPath();
+                        ctx.moveTo(node.pos.x + midx, node.pos.y + midy);
+                        ctx.lineTo(other.pos.x + midx, other.pos.y + midy);
+                        ctx.stroke();
+                    })
+                })
+
+                Object.entries(nodes).forEach(([id, node]) => {
+                    let rgb = node.color;
+                    ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.9)`;
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0)';
+                    ctx.beginPath();
+                    ctx.arc(node.pos.x + midx, node.pos.y + midy, 10, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.fillStyle = 'black';
+                    ctx.fillText(id, node.pos.x + midx - 5, node.pos.y + midy);
+                })
+
+                prevTime = timestamp;
+                requestAnimationFrame(draw);
+            }
+
+            requestAnimationFrame(draw)
+        }
+
+        function resize() {
+            const canvas = document.getElementById('map');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+    </script>
+</head>
+
+<body onload="setup()" onresize="resize()">
+    <canvas id="map"></canvas>
+</body>
+
+</html>
