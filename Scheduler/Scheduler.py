@@ -53,7 +53,7 @@ def request_ride():
         closest_car = find_closest_car(cars, current_location)
 
         # tell inventory car is being used
-        mark_in_use(closest_car)
+        mark_in_use(closest_car, current_location, destination)
 
         # send the car to the requester
         send_to_requester(closest_car, current_location, destination)
@@ -113,9 +113,11 @@ def find_closest_car(cars, destination):
 '''
 sends a put request to inventory to make a car as in use
 /mark/in/use?id={id}
+/api/car/{car_id}/trip?from={node_id}&to={node_id}
 '''
-def mark_in_use(id):
-    pass
+def mark_in_use(id, frm, to):
+    request = requests(f"{aidoom_endpoint}/mark/in/user?id={id}")
+    request = requests(f"{WorldState_endpoint}/api/car/{id}/trip?from={frm}&to={to}")
 
 '''
 makes a request to the PFaaS to find the best path from a 
