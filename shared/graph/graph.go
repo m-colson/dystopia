@@ -1,4 +1,4 @@
-package main
+package graph
 
 import "strconv"
 
@@ -6,7 +6,7 @@ type NodeID uint64
 
 const SENTINAL_NODE = NodeID(1<<63 - 1)
 
-func ParseNodeID(s string) (out NodeID, err error) {
+func ParseID(s string) (out NodeID, err error) {
 	idNum, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {
 		return SENTINAL_NODE, err
@@ -15,7 +15,7 @@ func ParseNodeID(s string) (out NodeID, err error) {
 }
 
 type Graph struct {
-	Nodes map[NodeID]Node
+	Nodes map[NodeID]Node `json:"nodes"`
 }
 
 type Link struct {
@@ -24,7 +24,7 @@ type Link struct {
 	To   NodeID
 }
 
-func NewGraph(links ...Link) Graph {
+func New(links ...Link) Graph {
 	nodes := make(map[NodeID]Node)
 
 	for _, link := range links {
@@ -43,7 +43,7 @@ func NewGraph(links ...Link) Graph {
 	return Graph{Nodes: nodes}
 }
 
-func NewGraphRaw(start ...Node) Graph {
+func NewRaw(start ...Node) Graph {
 	nodes := make(map[NodeID]Node)
 
 	idCount := 1
@@ -56,7 +56,7 @@ func NewGraphRaw(start ...Node) Graph {
 }
 
 type Node struct {
-	Next []Edge
+	Next []Edge `json:"next"`
 }
 
 func NewNode(edges ...Edge) Node {
@@ -64,8 +64,8 @@ func NewNode(edges ...Edge) Node {
 }
 
 type Edge struct {
-	To   NodeID
-	Cost Cost
+	To   NodeID `json:"to"`
+	Cost Cost   `json:"cost"`
 }
 
 type Cost uint64
@@ -73,11 +73,11 @@ type Cost uint64
 type DataEntry struct {
 	Id    NodeID
 	Cost  Cost
-	index int
+	Index int
 }
 
 func (h *DataEntry) Done() bool {
-	return h.index == -1
+	return h.Index == -1
 }
 
 type DataHeap []*DataEntry
@@ -86,14 +86,14 @@ func (h DataHeap) Len() int           { return len(h) }
 func (h DataHeap) Less(i, j int) bool { return h[i].Cost < h[j].Cost }
 func (h DataHeap) Swap(i, j int) {
 	h[i], h[j] = h[j], h[i]
-	h[i].index = i
-	h[j].index = j
+	h[i].Index = i
+	h[j].Index = j
 }
 
 func (h *DataHeap) Push(x any) {
 	n := len(*h)
 	entry := x.(*DataEntry)
-	entry.index = n
+	entry.Index = n
 	*h = append(*h, entry)
 }
 
@@ -102,7 +102,7 @@ func (h *DataHeap) Pop() any {
 	n := len(old)
 	item := old[n-1]
 	old[n-1] = &DataEntry{}
-	item.index = -1
+	item.Index = -1
 	*h = old[0 : n-1]
 	return item
 }

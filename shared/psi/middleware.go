@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-func Use(middlewares ...func(http.Handler) http.Handler) func(Server, Router) error {
-	return func(m Server, r Router) error {
+func Use(middlewares ...func(http.Handler) http.Handler) func(Router) error {
+	return func(r Router) error {
 		r.Use(middlewares...)
 		return nil
 	}
