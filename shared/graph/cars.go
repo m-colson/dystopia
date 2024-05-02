@@ -15,7 +15,7 @@ type Car struct {
 	ID       CarID
 	Trip     Trip
 	Pos      CarPos
-	CurrPath []NodeID
+	CurrPath []Edge
 }
 
 type CarID uint64
@@ -39,4 +39,5 @@ type CarPos struct {
 	From  NodeID  `json:"from"`
 	To    NodeID  `json:"to"`
 	Ratio float64 `json:"ratio"`
+	Cost  Cost    `json:"cost"`
 }

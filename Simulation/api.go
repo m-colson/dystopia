@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -125,11 +126,16 @@ func AddApiRoutes(r psi.Router) error {
 					return queryErr
 				}
 
-				if car.Trip.To != graph.SENTINAL_NODE {
-					return &psi.BadRequestError{Inner: fmt.Errorf("car %d is already on a trip", car.ID)}
-				}
+				{
+					cars := r.Context().Value(graph.CarsKey{}).(*graph.CarsMap)
+					cars.Lock.Lock()
+					defer cars.Lock.Unlock()
 
-				car.Trip = graph.Trip{From: from, To: to}
+					if car.Trip.To != graph.SENTINAL_NODE {
+						return &psi.BadRequestError{Inner: fmt.Errorf("car %d is already on a trip", car.ID)}
+					}
+					car.Trip = graph.Trip{From: from, To: to}
+				}
 
 				return &psi.NoData{}
 			})
@@ -192,6 +198,31 @@ func AddApiRoutes(r psi.Router) error {
 
 				return &Response{Graph: g}
 			})
+		})
+
+		r.PostRaw("/ride", func(w http.ResponseWriter, r *http.Request) {
+			proxyReq, err := http.NewRequest("POST", fmt.Sprintf("%s/ride", SCHEDULER_HOST), r.Body)
+			if err != nil {
+				panic(err)
+			}
+
+			proxyReq.Header = r.Header
+
+			client := http.Client{}
+			resp, err := client.Do(proxyReq)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			defer resp.Body.Close()
+
+			for k, v := range resp.Header {
+				for _, v := range v {
+					w.Header().Add(k, v)
+				}
+			}
+			w.WriteHeader(resp.StatusCode)
+			io.Copy(w, resp.Body)
 		})
 	})
 	return nil

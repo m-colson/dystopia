@@ -12,24 +12,28 @@ public class VehicleController {
 
     public VehicleController(VehicleService vehicleService) {
         this.vehicleService = vehicleService;
+        vehicleService.inventoryProcessor();
     }
 
     @GetMapping("/find/cars")
-
     public List<Vehicle> findCars(@RequestParam int capacity,  @RequestParam(required = false) String flags) {
         System.out.println("Capacity: " + capacity);
         System.out.println("Flags String: " + flags);
-        vehicleService.inventoryProcessor();
         return vehicleService.findVehicles(capacity, VehicleFlag.parseCommaSeperated(flags));
     }
 
     @PostMapping("/mark/in/use")
-    public void markVehicleInUse(@RequestParam int id) {
+    public String markVehicleInUse(@RequestParam int id) {
         vehicleService.markVehicleAsUsed(id);
+        System.out.println("Marked: " + id);
+
+        return "";
     }
 
     @PostMapping("/mark/ride/over")
-    public void returningVehicles(@RequestParam int id ){
-        vehicleService.returningVehicles(id);       
+    public String returningVehicles(@RequestParam int id ){
+        vehicleService.returningVehicles(id);
+
+        return "";   
     }
 }

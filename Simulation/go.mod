@@ -15,5 +15,6 @@ require (
 
 require (
 	github.com/go-chi/chi/v5 v5.0.12
+	github.com/lampctl/go-sse v1.1.4
 	github.com/m-colson/dystopia/shared/graph v0.0.0-00010101000000-000000000000
 )

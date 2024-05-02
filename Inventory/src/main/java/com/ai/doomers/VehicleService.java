@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class VehicleService {
 
-    private static final String CSV_FILE = "Inventory\\Car_Inventory.csv";
+    private static final String CSV_FILE = "Car_Inventory.csv";
     private HashMap<Integer, Vehicle> inactiveVehicles = new HashMap<>(); // Vehicles that are not in use
     private HashMap<Integer, Vehicle> inUseVehicles = new HashMap<>(); // Vehicles that are in use
 

@@ -16,12 +16,19 @@ import (
 func GenerateMap(w io.Writer, nodes int, edges int, avgcost float64) {
 	median := avgcost / math.Ln2
 
+	zero_to := rand.IntN(nodes)
+	zero_cost := math.Ceil(-median * math.Log2(1-rand.Float64()))
+
+	fmt.Fprintf(w, "%d->%d:%d\n", 0, zero_to, int(zero_cost))
+	fmt.Fprintf(w, "%d->%d:%d\n", zero_to, 0, int(zero_cost))
+
 	for i := 0; i < edges; i++ {
 		from := rand.IntN(nodes)
 		to := rand.IntN(nodes)
 		cost := math.Ceil(-median * math.Log2(1-rand.Float64()))
 
 		fmt.Fprintf(w, "%d->%d:%d\n", from, to, int(cost))
+		fmt.Fprintf(w, "%d->%d:%d\n", to, from, int(cost))
 	}
 }
 

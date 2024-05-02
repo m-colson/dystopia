@@ -1,0 +1,26 @@
+version: "3.0"
+services:
+  pfaas:
+    build:
+      context: ./PFaaS
+      additional_contexts:
+        shared: ./shared
+      dockerfile: Dockerfile
+    ports:
+      - ":9080"
+  frontend:
+    build:
+      context: ./Simulation
+      additional_contexts:
+        shared: ./shared
+      dockerfile: Dockerfile
+    ports:
+      - "80:9081"
+  scheduler:
+    build: ./Scheduler
+    ports:
+      - ":7080"
+  inventory:
+    build: ./Inventory
+    ports:
+      - ":8080"

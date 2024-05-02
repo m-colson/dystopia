@@ -114,9 +114,8 @@
     </style>
 
     <script>
-        const schedulerHost = 'http://localhost:5000';
-
         var nodes = {};
+        var cars = {};
 
         function loadNodes() {
             function hsv2rgb(h, s, v) {
@@ -227,6 +226,14 @@
 
         function setup() {
             resize();
+            
+            const tickSource = new EventSource("/events")
+            tickSource.addEventListener("tick", (event) => {
+                const data = JSON.parse(event.data);
+                cars = data.cars;
+                
+                console.log(data)
+            })
 
             const canvas = document.getElementById('map');
             const ctx = canvas.getContext('2d');
@@ -270,6 +277,50 @@
 
                     ctx.fillStyle = 'black';
                     ctx.fillText(id, node.pos.x + midx - 5, node.pos.y + midy);
+                })
+
+                Object.entries(cars).forEach(([id, car]) => {
+                    let fromNode = nodes[car.Pos.from]
+
+                    let dist = 0;
+                    let ang = 0;
+
+                    if (car.Pos.to < 100000000) {
+                        let toNode = nodes[car.Pos.to]
+                        if (toNode == undefined) {
+                            console.error("node " + car.Pos.to + " doesn't exist")
+                            return
+                        }
+
+                        let dx = toNode.pos.x - fromNode.pos.x;
+                        let dy = toNode.pos.y - fromNode.pos.y;
+                        dist = Math.sqrt(
+                            Math.pow(dx, 2) +
+                            Math.pow(dy, 2)
+                        );
+
+                        ang = Math.atan2(dy, dx);
+                    }
+
+                    ctx.fillStyle = 'white';
+                    ctx.strokeStyle = 'black';
+
+                    let absx = dist * car.Pos.ratio * Math.cos(ang) + fromNode.pos.x + midx
+                    let absy = dist * car.Pos.ratio * Math.sin(ang) + fromNode.pos.y + midy
+
+                    const rectWidth = 20;
+                    const rectHeight = 10;
+
+                    ctx.save();
+                    
+                    ctx.beginPath();
+                    ctx.translate(absx + rectWidth/2, absy + rectHeight/2)
+                    ctx.rotate(ang);
+                    ctx.rect(-rectWidth/2, -rectHeight/2, rectWidth, rectHeight);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.restore();
                 })
 
                 prevTime = timestamp;
@@ -317,7 +368,7 @@
                 }
 
                 let resp = await fetch(
-                    `/proxy/${schedulerHost}/ride`,
+                    `/api/ride`,
                     {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -348,7 +399,7 @@
                 }
             }
         }
-    </script>
+        </script>
 </head>
 
 <body onload="setup()" onresize="resize()">

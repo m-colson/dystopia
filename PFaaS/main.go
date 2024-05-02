@@ -1,9 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -66,109 +67,156 @@ func parseQueryParam(r *http.Request, name string) (graph.NodeID, psi.StatusCode
 
 type GraphKey struct{}
 
-func RequestInsertGraph(next http.Handler) http.Handler {
-	graph := graph.New([]graph.Link{
-		{From: 1, Cost: 5, To: 2},
-		{From: 1, Cost: 1, To: 3},
-		{From: 2, Cost: 1, To: 4},
-		{From: 2, Cost: 1, To: 5},
-		{From: 3, Cost: 1, To: 5},
-		{From: 3, Cost: 2, To: 7},
-		{From: 4, Cost: 1, To: 6},
-		{From: 5, Cost: 2, To: 6},
-		{From: 6, Cost: 1, To: 8},
-		{From: 7, Cost: 6, To: 8},
-	}...)
+func RequestInsertGraph() func(http.Handler) http.Handler {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/graph", WORLD_STATE_HOST), nil)
+	if err != nil {
+		panic(err)
+	}
 
+	resp, err := (&http.Client{}).Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	type message struct {
+		Graph graph.Graph `json:"graph"`
+	}
+
+	g := message{}
+
+	if err := json.NewDecoder(resp.Body).Decode(&g); err != nil {
+		panic(err)
+	}
+
+	fmt.Println("loaded", g.Graph)
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r = r.WithContext(context.WithValue(r.Context(), GraphKey{}, g.Graph))
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+type OutputLogger struct {
+	http.ResponseWriter
+	Output *bytes.Buffer
+}
+
+func (ol *OutputLogger) Write(buf []byte) (written int, err error) {
+	written, err = ol.ResponseWriter.Write(buf)
+	if err == nil {
+		ol.Output.Write(buf)
+	}
+
+	return
+}
+
+func LogOutput(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r = r.WithContext(context.WithValue(r.Context(), GraphKey{}, graph))
-		next.ServeHTTP(w, r)
+		logger := &OutputLogger{w, new(bytes.Buffer)}
+		next.ServeHTTP(logger, r)
+
+		fmt.Println(">>> " + logger.Output.String())
 	})
 }
 
-func AddRoutes(r psi.Router) error {
-	r.Use(psi.LogRecoverer, RequestInsertGraph)
+func AddRoutes(extraMiddlewares ...func(http.Handler) http.Handler) func(r psi.Router) error {
+	return func(r psi.Router) error {
+		r.Use(psi.LogRecoverer)
+		r.Use(extraMiddlewares...)
+		r.Use(LogOutput)
 
-	r.WithGroup("/api", func(r psi.Router) {
-		r.Get("/", func(r *http.Request) psi.StatusCode {
-			type Metadata struct {
-				psi.OkData
-				Versions []string `json:"versions"`
-			}
-
-			return &Metadata{Versions: []string{"0.0.1"}}
-		})
-		r.Get("/path", func(r *http.Request) psi.StatusCode {
-			type PathResponse struct {
-				psi.OkData
-				Path []graph.NodeID `json:"path"`
-				// TotalTime float64  `json:"totalTime"`
-			}
-
-			from, queryErr := parseQueryParam(r, "from")
-			if queryErr != nil {
-				return queryErr
-			}
-
-			to, queryErr := parseQueryParam(r, "to")
-			if queryErr != nil {
-				return queryErr
-			}
-
-			graph := r.Context().Value(GraphKey{}).(graph.Graph)
-			path := Dijkstra(graph, from, to)
-
-			return &PathResponse{Path: path}
-		})
-		r.Get("/closest", func(r *http.Request) psi.StatusCode {
-			type ClosestResponse struct {
-				psi.OkData
-				Id graph.NodeID `json:"id"`
-			}
-
-			to, queryErr := parseQueryParam(r, "to")
-			if queryErr != nil {
-				return queryErr
-			}
-
-			carOptionsRaw, queryErr := queryParam(r, "options")
-			if queryErr != nil {
-				return queryErr
-			}
-			carOptionsStrs := strings.Split(carOptionsRaw, ",")
-
-			carOptions := make([]graph.CarID, 0, len(carOptionsStrs))
-			for _, optionStr := range carOptionsStrs {
-				option, err := graph.ParseCarID(optionStr)
-				if err != nil {
-					return &IllegalQueryParam{name: "options", value: carOptionsRaw, inner: err}
+		r.WithGroup("/api", func(r psi.Router) {
+			r.Get("/", func(r *http.Request) psi.StatusCode {
+				type Metadata struct {
+					psi.OkData
+					Versions []string `json:"versions"`
 				}
-				carOptions = append(carOptions, option)
-			}
 
-			cars, err := findCarIDS(carOptions...)
-			if err != nil {
-				panic(err)
-			}
+				return &Metadata{Versions: []string{"0.0.1"}}
+			})
+			r.Get("/path", func(r *http.Request) psi.StatusCode {
+				type PathResponse struct {
+					psi.OkData
+					Path []graph.Edge `json:"path"`
+					// TotalTime float64  `json:"totalTime"`
+				}
 
-			options := make([]graph.NodeID, 0, len(cars))
-			for _, car := range cars {
-				options = append(options, car.Pos.From)
-			}
+				from, queryErr := parseQueryParam(r, "from")
+				if queryErr != nil {
+					return queryErr
+				}
 
-			graph := r.Context().Value(GraphKey{}).(graph.Graph)
-			node, ok := DijkstraClosest(graph, to, options...)
-			if !ok {
-				return &psi.NotAcceptableError{}
-			}
+				to, queryErr := parseQueryParam(r, "to")
+				if queryErr != nil {
+					return queryErr
+				}
 
-			return &ClosestResponse{Id: node}
+				graph := r.Context().Value(GraphKey{}).(graph.Graph)
+				path := Dijkstra(graph, from, to)
+
+				return &PathResponse{Path: path}
+			})
+			r.Get("/closest", func(r *http.Request) psi.StatusCode {
+				type ClosestResponse struct {
+					psi.OkData
+					Id graph.CarID `json:"id"`
+				}
+
+				to, queryErr := parseQueryParam(r, "to")
+				if queryErr != nil {
+					return queryErr
+				}
+
+				carOptionsRaw, queryErr := queryParam(r, "options")
+				if queryErr != nil {
+					return queryErr
+				}
+				carOptionsStrs := strings.Split(carOptionsRaw, ",")
+
+				carOptions := make([]graph.CarID, 0, len(carOptionsStrs))
+				for _, optionStr := range carOptionsStrs {
+					option, err := graph.ParseCarID(optionStr)
+					if err != nil {
+						return &IllegalQueryParam{name: "options", value: carOptionsRaw, inner: err}
+					}
+					carOptions = append(carOptions, option)
+				}
+
+				fmt.Println("given", carOptions)
+
+				cars, err := findCarIDS(carOptions...)
+				if err != nil {
+					panic(err)
+				}
+
+				options := make([]graph.NodeID, 0, len(cars))
+				for _, car := range cars {
+					options = append(options, car.Pos.From)
+				}
+
+				graph := r.Context().Value(GraphKey{}).(graph.Graph)
+				node, ok := DijkstraClosest(graph, to, options...)
+				if !ok {
+					return &psi.NotAcceptableError{}
+				}
+
+				for _, car := range cars {
+					if car.Pos.From == node {
+						return &ClosestResponse{Id: car.ID}
+					}
+				}
+
+				panic("found a node that was not a car's position?")
+			})
 		})
-	})
-	return nil
+		return nil
+	}
 }
 
-const WORLD_STATE_HOST = "http://localhost:9081"
+const WORLD_STATE_HOST = "http://frontend:9081"
 
 func findCarIDS(ids ...graph.CarID) ([]graph.Car, error) {
 	client := http.Client{}
@@ -192,24 +240,22 @@ func findCarIDS(ids ...graph.CarID) ([]graph.Car, error) {
 	}
 	defer resp.Body.Close()
 
-	out := make([]graph.Car, 0, len(ids))
-
-	if respBytes, err := io.ReadAll(resp.Body); err == nil {
-		fmt.Printf("%s\n", respBytes)
-	} else {
-		fmt.Println(err)
+	type message struct {
+		Cars []graph.Car `json:"cars"`
 	}
 
-	// if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-	// 	return nil, err
-	// }
+	out := message{}
 
-	return out, nil
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+
+	return out.Cars, nil
 }
 
 func main() {
 	psi.New[*psi.PsiServer](
 		backend.Register,
-		AddRoutes,
-	).Serve("localhost:9080").OrFatal()
+		AddRoutes(RequestInsertGraph()),
+	).Serve("pfaas:9080").OrFatal()
 }

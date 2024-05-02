@@ -22,9 +22,9 @@ import requests
 from flask import Flask, request
 app = Flask(__name__)
 
-PFaaS_endpoint = "http://127.0.0.1:9080"
-aidoom_endpoint = "http://127.0.0.1:8080" 
-WorldState_endpoint = "http://127.0.0.1:9081"
+PFaaS_endpoint = "http://pfaas:9080"
+aidoom_endpoint = "http://inventory:8080" 
+WorldState_endpoint = "http://frontend:9081"
 
 '''
 This endpoint gets called when someone requests a ride from the frontend.
@@ -53,6 +53,9 @@ def request_ride():
     # get closest car from PFaaS
     closest_car = find_closest_car(cars, current_location)
 
+    if closest_car == -1:
+        return "no car could make a path", 406
+
     # tell inventory car is being used
     mark_in_use(closest_car, current_location, destination)
 
@@ -69,6 +72,7 @@ PFaaS
 @app.put("/ride/at/start")
 def ride_arrived():
     print("ride arrived!")
+    return ""
 
 '''
 This enpoint gets called when a ride is done. The worldstate sends the 
@@ -76,16 +80,17 @@ id of the car whose ride is done as a parameter 'id'
 '''
 @app.put("/ride/at/dest")
 def ride_done():
-    endpoint = aidoom_endpoint + f"mark/ride/over?id={requests.args.get('id')}"
-    request = requests(endpoint)
+    endpoint = aidoom_endpoint + f"/mark/ride/over?id={request.args.get('id')}"
+    requests.post(endpoint)
     print("ride done!")
+    return ""
 
 '''
 makes a request to the inventory to get all cars that match the requesters
 needs. ie number of passengers and disabilities
 '''
 def find_cars(capacity, flags=""):
-    endpoint = f"http://127.0.0.1:8080/find/cars?capacity={capacity}"
+    endpoint = f"{aidoom_endpoint}/find/cars?capacity={capacity}"
     if flags != "":
         endpoint += f"&flags={flags}"
     print(endpoint)
@@ -102,7 +107,10 @@ def find_closest_car(cars, destination):
 
     request = requests.get(endpoint)
 
-    return request.json()["id"]
+    if "id" in request.json():
+        return request.json()["id"]
+
+    return -1
     
 '''
 sends a put request to inventory to make a car as in use
@@ -110,8 +118,8 @@ sends a put request to inventory to make a car as in use
 /api/car/{car_id}/trip?from={node_id}&to={node_id}
 '''
 def mark_in_use(id, frm, to):
-    request = requests.put(f"{aidoom_endpoint}/mark/in/user?id={id}")
-    request = requests.post(f"{WorldState_endpoint}/api/car/{id}/trip?from={frm}&to={to}")
+    print(requests.post(f"{aidoom_endpoint}/mark/in/use?id={id}"))
+    print(requests.post(f"{WorldState_endpoint}/api/car/{id}/trip?from={frm}&to={to}"))
 
 '''
 makes a request to the PFaaS to find the best path from a 
@@ -124,4 +132,4 @@ def send_to_requester(id, rider_location, destination):
     return 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)

@@ -35,6 +35,12 @@ func (l *loggedResponse) WriteHeader(statusCode int) {
 	l.Status = statusCode
 }
 
+func (l *loggedResponse) Flush() {
+	if flusher, ok := l.Inner.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
 func LogRecoverer(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(innerW http.ResponseWriter, r *http.Request) {
 		startTime := time.Now()
