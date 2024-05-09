@@ -4,6 +4,8 @@
 <head>
     <title>World Simulation</title>
 
+    <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+
     <style>
         :root {
             font-size: 24px;
@@ -31,13 +33,36 @@
             height: 100%;
         }
 
+        .log-window {
+            position: fixed;
+            top: 1rem;
+            margin: 0 auto;
+
+            width: 15rem;
+
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .log-window p {
+            padding: 0.5rem;
+            border-radius: 1rem;
+
+            background-color: #2e2e2e;
+        }
+
+        .log-error {
+            color: #ff8877; 
+        }
+
         .property-window {
             position: fixed;
             bottom: 1rem;
             right: 1rem;
 
             border-radius: 1rem;
-            background-color: #2e2e2e;
+            background-color: rgba(46, 46, 46, 0.7);
 
             padding: 1rem;
 
@@ -116,6 +141,7 @@
     <script>
         var nodes = {};
         var cars = {};
+        var carsMeta = {};
 
         function loadNodes() {
             function hsv2rgb(h, s, v) {
@@ -134,28 +160,46 @@
                                 x: (Math.random() - 0.5) * 1000,
                                 y: (Math.random() - 0.5) * 1000,
                             }
+                            nodes[id].vel = {
+                                x: (Math.random() - 0.5) * 2,
+                                y: (Math.random() - 0.5) * 2,
+                            }
                             nodes[id].color = hsv2rgb(Math.random() * 360, 0.6, 1);
                         } else {
                             nodes[id].next = node.next;
                         }
                     })
+
+                    let error;
+                    for (let i=0; i < 4000; i++){
+                        error = updateNodes();
+                    }
+
+                    addToLog("loaded map: " + Math.round(error) + " pxs error", 5000)
                 })
         }
         loadNodes();
 
         function updateNodes() {
-            const COST_MUL = 30;
-            const CENTER_FORCE = 1;
-            const ATTRACT_FORCE = 10;
-            const REPEL_FORCE = 100000;
+            const COST_MUL = 40;
+            const CENTER_FORCE = 100;
+            const ATTRACT_SCALE = 10;
+            const REPEL_FORCE = 70;
+            const FORCE_MULT = 30;
 
             if (Object.keys(nodes).length === 0) {
                 return;
             }
 
             let deltas = {
+                // 0: {
+                //     x: -nodes[0].pos.x * CENTER_FORCE,
+                //     y: -nodes[0].pos.y * CENTER_FORCE,
+                // }
             };
 
+            let totalErrors = 0.0;
+            
             // TERRIBLE ALGORITHM
             let nodeEntries = Object.entries(nodes);
             nodeEntries.forEach(([id, node]) => {
@@ -166,62 +210,79 @@
                     return acc;
                 }, {})
 
-
                 nodeEntries.forEach(([otherId, otherNode]) => {
-                    deltas[otherId] ??= {
-                        x: -otherNode.pos.x * CENTER_FORCE,
-                        y: -otherNode.pos.y * CENTER_FORCE,
+                    {
+                        let dist2 = Math.pow(Math.sqrt(Math.pow(otherNode.pos.x, 2) + Math.pow(otherNode.pos.y, 2)) / 500, 2)
+                        let ang = Math.atan2(otherNode.pos.y, otherNode.pos.x)
+                        deltas[otherId] ??= {
+                            x: -Math.cos(ang) * CENTER_FORCE * dist2,
+                            y: -Math.sin(ang) * CENTER_FORCE * dist2,
+                        }
                     }
+
+                    // deltas[otherId] ??= {
+                    //     x: 0,
+                    //     y: 0,
+                    // }
 
                     if (id === otherId) {
                         return;
                     }
 
-                    if (edges[otherId] !== undefined) {
-                        edges[otherId].forEach(cost => {
-                            let distx = node.pos.x - otherNode.pos.x;
-                            let disty = node.pos.y - otherNode.pos.y;
+                    let distx = node.pos.x - otherNode.pos.x;
+                    let disty = node.pos.y - otherNode.pos.y;
+                    
+                    let dist = Math.sqrt(Math.pow(distx, 2) + Math.pow(disty, 2));
+                    if (dist < 0.1) {
+                        dist = 0.1;
+                    }
+                            
+                    let ang = Math.atan2(disty, distx);
 
-                            let dist = Math.sqrt(Math.pow(distx, 2) + Math.pow(disty, 2));
-                            let target = cost * COST_MUL;
-
-                            let force = (dist - target) * ATTRACT_FORCE;
-                            let ang = Math.atan2(disty, distx);
-
-                            let dx = Math.cos(ang) * force;
-                            let dy = Math.sin(ang) * force;
-                            deltas[otherId].x += dx;
-                            deltas[otherId].y += dy;
-                            deltas[id].x -= dx;
-                            deltas[id].y -= dy;
-                        })
-                    } else {
-                        let distx = node.pos.x - otherNode.pos.x;
-                        let disty = node.pos.y - otherNode.pos.y;
-
-                        let dist = Math.pow(distx, 2) + Math.pow(disty, 2);
-                        if (dist < 0.1) {
-                            dist = 0.1;
-                        }
-
-                        let ang = Math.atan2(disty, distx);
-
-                        let dx = Math.cos(ang) * (1 / dist) * REPEL_FORCE;
-                        let dy = Math.sin(ang) * (1 / dist) * REPEL_FORCE;
+                    {
+                        let dx = Math.cos(ang) * (1 / Math.pow(dist, 2)) * REPEL_FORCE * FORCE_MULT;
+                        let dy = Math.sin(ang) * (1 / Math.pow(dist, 2)) * REPEL_FORCE * FORCE_MULT;
                         deltas[otherId].x -= dx;
                         deltas[otherId].y -= dy;
                         deltas[id].x += dx;
                         deltas[id].y += dy;
                     }
+                    
+                    if (edges[otherId] !== undefined) {
+                        edges[otherId].forEach(cost => {
+                            let target = cost * COST_MUL;
+                            let targetBase = ATTRACT_SCALE + REPEL_FORCE / Math.pow(target, 2);
+
+                            let force = -(Math.pow(targetBase, dist / target) - ATTRACT_SCALE);
+                            let ang = Math.atan2(disty, distx);
+
+                            totalErrors += Math.abs(dist - target)
+
+                            let dx = Math.cos(ang) * force * FORCE_MULT;
+                            let dy = Math.sin(ang) * force * FORCE_MULT;
+                            deltas[otherId].x -= dx;
+                            deltas[otherId].y -= dy;
+                            deltas[id].x += dx;
+                            deltas[id].y += dy;
+                        })
+                    }
                 });
             })
-
+           
             Object.entries(deltas).forEach(([id, d]) => {
                 let cdist = Math.sqrt(Math.pow(d.x, 2) + Math.pow(d.y, 2));
 
-                nodes[id].pos.x += d.x * 0.01;
-                nodes[id].pos.y += d.y * 0.01;
+                nodes[id].vel.x += Math.max(Math.min(d.x * 0.02, 10), -10);
+                nodes[id].vel.y += Math.max(Math.min(d.y * 0.02, 10), -10);
+
+                nodes[id].pos.x += nodes[id].vel.x * 0.02;
+                nodes[id].pos.y += nodes[id].vel.y * 0.02;
+
+                nodes[id].vel.x *= 0.99;
+                nodes[id].vel.y *= 0.99;
             })
+
+            return totalErrors;
         }
 
         function setup() {
@@ -230,9 +291,7 @@
             const tickSource = new EventSource("/events")
             tickSource.addEventListener("tick", (event) => {
                 const data = JSON.parse(event.data);
-                cars = data.cars;
-                
-                console.log(data)
+                cars = data.cars;                
             })
 
             const canvas = document.getElementById('map');
@@ -246,8 +305,6 @@
                     prevTime = timestamp;
                 }
                 const dt = timestamp - prevTime;
-
-                updateNodes(dt);
 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -283,7 +340,8 @@
                     let fromNode = nodes[car.Pos.from]
 
                     let dist = 0;
-                    let ang = 0;
+                    let ang = carsMeta[id] ?? 0;
+                    let targetAng = ang;
 
                     if (car.Pos.to < 100000000) {
                         let toNode = nodes[car.Pos.to]
@@ -299,26 +357,41 @@
                             Math.pow(dy, 2)
                         );
 
-                        ang = Math.atan2(dy, dx);
+                        targetAng = Math.atan2(dy, dx);
+
+                        if (targetAng - ang > Math.PI) {
+                            ang = ang * 0.95 + (targetAng - Math.PI * 2) * 0.05;
+                        } else if (targetAng - ang < -Math.PI) {
+                            ang = ang * 0.95 + (targetAng + Math.PI * 2) * 0.05;
+                        } else {
+                            ang = ang * 0.95 + targetAng * 0.05;
+                        }
                     }
+
+                    if (ang < 0) {
+                        ang += Math.PI * 2
+                    }
+                    if (ang > Math.PI * 2) {
+                        ang -= Math.PI * 2
+                    }
+
+                    carsMeta[id] = ang
 
                     ctx.fillStyle = 'white';
                     ctx.strokeStyle = 'black';
 
-                    let absx = dist * car.Pos.ratio * Math.cos(ang) + fromNode.pos.x + midx
-                    let absy = dist * car.Pos.ratio * Math.sin(ang) + fromNode.pos.y + midy
+                    let absx = dist * car.Pos.ratio * Math.cos(targetAng) + fromNode.pos.x + midx
+                    let absy = dist * car.Pos.ratio * Math.sin(targetAng) + fromNode.pos.y + midy
 
                     const rectWidth = 20;
                     const rectHeight = 10;
 
                     ctx.save();
                     
-                    ctx.beginPath();
-                    ctx.translate(absx + rectWidth/2, absy + rectHeight/2)
+                    ctx.translate(absx, absy);
                     ctx.rotate(ang);
-                    ctx.rect(-rectWidth/2, -rectHeight/2, rectWidth, rectHeight);
-                    ctx.fill();
-                    ctx.stroke();
+                    
+                    ctx.fillRect(-rectWidth/2, -rectHeight/2, rectWidth, rectHeight);
 
                     ctx.restore();
                 })
@@ -356,6 +429,21 @@
                     capacity: document.getElementById('request-cap').value,
                 }
 
+                if (reqBody.from == "") {
+                    addErrToLog("no from specified!", 4000);
+                    return;
+                }
+
+                if (reqBody.to == "") {
+                    addErrToLog("no to specified!", 4000);
+                    return;
+                }
+
+                if (reqBody.from == reqBody.to) {
+                    addErrToLog("from and to are the same!", 4000);
+                    return;
+                }
+
                 let flags = [];
                 if (document.getElementById('request-wheelchair').checked) {
                     flags.push('wheelchair');
@@ -374,12 +462,21 @@
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(reqBody)
                     })
-                let body = await resp.json();
-                console.log(body);
+                let body = await resp.text();
+
+                if (resp.status >= 200 && resp.status < 300) {
+                    addToLog(body, 4000);
+                } else {
+                    addErrToLog(body, 4000);
+                }
+
+                
                 clearRequest();
             })
 
             return (event) => {
+                event.preventDefault();
+            
                 let worldX = event.x - window.innerWidth / 2;
                 let worldY = event.y - window.innerHeight / 2;
 
@@ -399,11 +496,41 @@
                 }
             }
         }
+
+        function addToLog(val, duration) {
+            let id = `log-${Date.now()}`            
+            let elm = document.createElement("p")
+            elm.setAttribute("id", id)
+            elm.innerText = val
+
+            document.getElementById("logs").appendChild(elm)
+
+            setTimeout(()=>{
+                document.getElementById(id).remove()
+            }, duration)
+        }
+
+        function addErrToLog(val, duration) {
+            let id = `log-${Date.now()}`            
+            let elm = document.createElement("p")
+            elm.setAttribute("id", id)
+            elm.setAttribute("class", "log-error")
+            elm.innerText = val
+
+            document.getElementById("logs").appendChild(elm)
+
+            setTimeout(()=>{
+                document.getElementById(id).remove()
+            }, duration)
+        }
+        
         </script>
 </head>
 
 <body onload="setup()" onresize="resize()">
     <canvas id="map"></canvas>
+    <div id="logs" class="log-window">
+    </div>
     <div class="property-window">
         <h1>new trip</h1>
         <span>

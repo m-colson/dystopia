@@ -8,6 +8,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - ":9080"
+    depends_on:
+      - frontend
   frontend:
     build:
       context: ./Simulation
@@ -15,7 +17,7 @@ services:
         shared: ./shared
       dockerfile: Dockerfile
     ports:
-      - "80:9081"
+      - "443:9081"
   scheduler:
     build: ./Scheduler
     ports:

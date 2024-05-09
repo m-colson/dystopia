@@ -26,6 +26,7 @@ func (m *PsiServer) ServeTLS() ServeError {
 		return m.LiftError(fmt.Errorf("a tls config is required to serve tls"))
 	}
 
+	log.Println("serving with tls on", m.Server.Addr)
 	return m.LiftError(m.Server.ListenAndServeTLS("", ""))
 }
 

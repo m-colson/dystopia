@@ -20,11 +20,14 @@ trip that the car can be put in the inactive pool again.
 
 import requests
 from flask import Flask, request
+from urllib3.exceptions import InsecureRequestWarning
 app = Flask(__name__)
 
 PFaaS_endpoint = "http://pfaas:9080"
 aidoom_endpoint = "http://inventory:8080" 
-WorldState_endpoint = "http://frontend:9081"
+WorldState_endpoint = "https://frontend:9081"
+
+requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 '''
 This endpoint gets called when someone requests a ride from the frontend.
@@ -119,7 +122,7 @@ sends a put request to inventory to make a car as in use
 '''
 def mark_in_use(id, frm, to):
     print(requests.post(f"{aidoom_endpoint}/mark/in/use?id={id}"))
-    print(requests.post(f"{WorldState_endpoint}/api/car/{id}/trip?from={frm}&to={to}"))
+    print(requests.post(f"{WorldState_endpoint}/api/car/{id}/trip?from={frm}&to={to}", verify=False))
 
 '''
 makes a request to the PFaaS to find the best path from a 
@@ -128,7 +131,7 @@ cars current location to the location of the requester
 '''
 def send_to_requester(id, rider_location, destination):
     endpoint = f"{WorldState_endpoint}/{id}/trip?from={rider_location}&to={destination}"
-    request = requests.post(endpoint)
+    request = requests.post(endpoint, verify=False)
     return 
 
 if __name__ == '__main__':

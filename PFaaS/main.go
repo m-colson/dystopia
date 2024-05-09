@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -73,7 +74,11 @@ func RequestInsertGraph() func(http.Handler) http.Handler {
 		panic(err)
 	}
 
-	resp, err := (&http.Client{}).Do(req)
+	resp, err := (&http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}).Do(req)
 	if err != nil {
 		panic(err)
 	}
@@ -216,10 +221,14 @@ func AddRoutes(extraMiddlewares ...func(http.Handler) http.Handler) func(r psi.R
 	}
 }
 
-const WORLD_STATE_HOST = "http://frontend:9081"
+const WORLD_STATE_HOST = "https://frontend:9081"
 
 func findCarIDS(ids ...graph.CarID) ([]graph.Car, error) {
-	client := http.Client{}
+	client := http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
 
 	idsStr := strings.Builder{}
 	for i, id := range ids {

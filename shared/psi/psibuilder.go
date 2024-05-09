@@ -136,15 +136,17 @@ func (m *PsiBuilder[T]) Serve(addr string) ServeError {
 	return s.Serve()
 }
 
-// func (m *PsiBuilder[T]) ServeTLS(addr string) ServeError {
-// 	s, err := m.Complete(addr)
-// 	if err != nil {
-// 		return s.LiftError(err)
-// 	}
+func (m *PsiBuilder[T]) ServeTLS(addr string) ServeError {
+	s, err := m.Complete(addr)
+	if err != nil {
+		return s.LiftError(err)
+	}
 
-// 	if m.tlsConfig == nil {
-// 		return s.LiftError(err)
-// 	}
+	if m.tlsConfig == nil {
+		return s.LiftError(err)
+	}
 
-// 	return s.ServeTLS()
-// }
+	tlsS := Server(s)
+
+	return tlsS.(TLSServer).ServeTLS()
+}

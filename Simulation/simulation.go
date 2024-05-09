@@ -9,7 +9,7 @@ import (
 	"github.com/m-colson/dystopia/shared/graph"
 )
 
-const SIMULATION_RATE = 0.3
+const SIMULATION_RATE = 0.1
 
 // NOTE: cars must be locked
 func SimulateOnce(cars *graph.CarsMap, g graph.Graph) (flaggedCars map[graph.CarID]struct{}) {

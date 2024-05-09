@@ -152,10 +152,11 @@ func main() {
 
 	psi.New[*psi.PsiServer](
 		backend.Register,
+		psi.AddTLSCert("cert.pem", "key.pem"),
 		psi.Use(psi.LogRecoverer, RequestInsertCars(&cars), RequestInsertGraph(&g)),
 		AddApiRoutes,
 		AddEventsRoute(eventServer),
 		FixWriteTimeout,
 		AddFrontendRoutes,
-	).Serve(":9081").OrFatal()
+	).ServeTLS(":9081").OrFatal()
 }
